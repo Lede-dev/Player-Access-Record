@@ -1,0 +1,159 @@
+
+options:
+
+	#변수 저장 ID
+	ID: PlayerAccessRecord
+
+
+#플레이어를 접속한 플레이어 목록에 추가합니다.
+function par_addPlayerToPlayerList(p:offlineplayer):
+	set {_uuid} to uuid of {_p}
+	set {{@ID}.PlayerList::%{_uuid}%} to {_p}
+	
+#서버에 한번이라도 접속한 플레이어의 목록을 반환합니다.
+function par_GetPlayerList() :: offlineplayers:
+	return {{@ID}.PlayerList::*}
+	
+#서버에 한번이라도 접속한 플레이어의 UUID 목록을 반환합니다.
+function par_GetUUIDList() :: strings:
+	loop {{@ID}.PlayerList::*}:
+		add loop-index to {_uuid::*}
+	return {_uuid::*}
+	
+#플레이어가 서버에 최초 접속한 시간을 저장합니다.
+function par_SetFirstJoin(p:offlineplayer):
+	set {_uuid} to uuid of {_p}
+	set {{@ID}.FirstJoin::%{_uuid}%} to now
+
+#플레이어가 서버에 최초 접속한 시간을 반환합니다.
+function par_GetFirstJoin(p:offlineplayer) :: date:
+	set {_uuid} to uuid of {_p}
+	return {{@ID}.FirstJoin::%{_uuid}%}
+	
+#플레이어의 최근 접속 시간을 저장합니다.
+function par_SetLastJoin(p:offlineplayer):
+	set {_uuid} to uuid of {_p}
+	set {{@ID}.LastJoin::%{_uuid}%} to now #플레이어의 최근 접속 시간을 저장합니다.
+	
+#플레이어의 최근 접속 시간을 반환합니다.
+function par_GetLastJoin(p:offlineplayer) :: date:
+	set {_uuid} to uuid of {_p}
+	return {{@ID}.LastJoin::%{_uuid}%} # 플레이어의 최근 접속 시간을 반환합니다.
+	
+#플레이어의 퇴장 시간을 저장합니다.
+function par_SetQuit(p:offlineplayer):
+	set {_uuid} to uuid of {_p}
+	set {{@ID}.Quit::%{_uuid}%} to now
+
+#플레이어의 퇴장 시간을 반환합니다.
+function par_GetQuit(p:offlineplayer) :: date:
+	if {_p} is online: # 플레이어가 접속중이라면 현재 시간을 반환합니다.
+		return now
+	set {_uuid} to uuid of {_p}	
+	return {{@ID}.Quit::%{_uuid}%} # 플레이어의 퇴장 시간을 반환합니다.
+
+#플레이어의 플레이타임을 저장합니다.
+function par_SetPlayTime(p:offlineplayer):
+	set {_uuid} to uuid of {_p}
+	set {_join} to par_GetLastJoin({_p}) 
+	set {_diff} to difference between {_join} and now
+	add {_diff} to {{@ID}.PlayTime::%{_uuid}%}
+	
+#플레이어의 플레이타임을 반환합니다.
+function par_GetPlayTime(p:offlineplayer) :: timespan:
+	set {_uuid} to uuid of {_p}
+	if {_p} is online: # 플레이어가 접속중이라면 현재 시간까지의 플레이타임을 반환
+		set {_join} to par_GetLastJoin({_p}) 
+		set {_diff} to difference between {_join} and now
+		set {_time} to {{@ID}.PlayTime::%{_uuid}%}
+		add {_diff} to {_time}
+		return {_time}
+	return {{@ID}.PlayTime::%{_uuid}%} # 플레이어가 오프라인이라면 설정된 플레이타임을 반환
+
+#플레이어의 접속 기록이 존재하는지 조회합니다.
+function par_IsPlayed(p:offlineplayer) :: boolean:
+	set {_uuid} to uuid of {_p}
+	if {{@ID}.FirstJoin::%{_uuid}%} is not set:
+		return false
+	return true
+	
+#Date 정보를 읽을 수 있도록 변환
+function par_TimeFormatted(d:date) :: string:
+	return {_d} formatted human-readable
+
+#플레이어 접속 시 데이터 설정
+on join:
+
+	#플레이어가 최초 접속 유저인지 확인합니다.
+	if par_IsPlayed(player) is not true:
+	
+		#플레이어를 서버에 한번이라도 접속한 플레이어 목록에 추가합니다.
+		par_addPlayerToPlayerList(player)
+
+		#최초 접속 시간 설정
+		par_SetFirstJoin(player)
+		par_SetLastJoin(player)
+		send "&e[RPG-Pack] 플레이어 &6%player% &e최초 접속" to console	
+			
+		#플레이타임 데이터 생성
+		par_SetPlayTime(player)
+	
+	#플레이어가 최초 접속 유저가 아닐 때 실행합니다.
+	else:
+	
+		#접속 시간 설정
+		par_SetLastJoin(player)
+		send "&e[RPG-Pack] 플레이어 &6%player% &e접속" to console
+	
+#플레이어 퇴장 시 데이터 설정
+on quit:
+	
+	#플레이어 퇴장 시간 설정
+	par_SetQuit(player)
+	send "&e[RPG-Pack] 플레이어 &6%player% &e퇴장" to console
+	
+	#플레이타임 증가
+	par_SetPlayTime(player)
+	
+#플레이어의 정보를 출력합니다.
+command /par [<offlineplayer>]:
+	permission: par.command.info
+	trigger:
+		if arg 1 is not set:
+			if sender is console:
+				send "&c플레이어를 입력해주세요."
+				send "&c/par <OfflinePlayer>"
+			else:
+				set {_first} to par_TimeFormatted(par_GetFirstJoin(player))
+				set {_last} to par_TimeFormatted(par_GetLastJoin(player))
+				set {_play} to par_GetPlayTime(player)
+				send "&e플레이어 &6%player%&e의 정보"
+				send " &e- 최초 접속 시간 : &b%{_first}%"
+				send " &e- 최근 접속 시간 : &b%{_last}%"
+				send " &e- 퇴장 시간 : &bONLINE"
+				send " &e- 플레이 타임 : &b%{_play}%"				
+		else if arg 1 is set:
+			if par_IsPlayed(arg 1) is not true:
+				send "&c플레이어의 접속 기록이 존재하지 않습니다."
+				stop
+			set {_first} to par_TimeFormatted(par_GetFirstJoin(arg 1))
+			set {_last} to par_TimeFormatted(par_GetLastJoin(arg 1))
+			set {_quit} to par_TimeFormatted(par_GetQuit(arg 1))
+			set {_play} to par_GetPlayTime(arg 1)
+			if arg 1 is online:
+				set {_quit} to "ONLINE"
+			send "&e플레이어 &6%arg 1%&e의 정보"
+			send " &e- 최초 접속 시간 : &b%{_first}%"
+			send " &e- 최근 접속 시간 : &b%{_last}%"
+			send " &e- 퇴장 시간 : &b%{_quit}%"
+			send " &e- 플레이 타임 : &b%{_play}%"
+
+
+
+
+
+
+
+
+
+
