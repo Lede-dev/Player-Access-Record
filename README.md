@@ -6,3 +6,6 @@
 
 ### 1.0.2
 - 플레이타임 TimeSpan 정보를 Number타입의 Second 데이터로 변환하는 함수추가
+
+### 1.0.3
+- TimeSpan -> Seconds 변환 함수 최적화
