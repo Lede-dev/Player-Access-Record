@@ -12,3 +12,6 @@
 
 ### 1.0.4
 - day, hour, minute, second 한글 표기 변환 함수 추가
+
+### 1.0.5
+- 시간 정보 day, hour, minute, second 미 변환 오류 수정
